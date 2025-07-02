@@ -1411,7 +1411,12 @@ class VertexGeminiConfig(VertexAIBaseConfig, BaseConfig):
         default_headers = {
             "Content-Type": "application/json",
         }
-        if api_key is not None:
+        if api_base is None and "api_base" in litellm_params:
+            api_base = litellm_params["api_base"]
+
+        if api_base is not None and "cloudflare" in api_base:
+            default_headers["x-goog-api-key"] = api_key
+        elif api_key is not None:
             default_headers["Authorization"] = f"Bearer {api_key}"
         if headers is not None:
             default_headers.update(headers)

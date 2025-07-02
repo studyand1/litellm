@@ -741,3 +741,53 @@ def test_vertex_ai_usage_metadata_missing_token_count():
     assert result.completion_tokens_details.audio_tokens == 0  # Default value for missing tokenCount
 
 
+def test_validate_environment_headers():
+    """
+    Tests the logic for setting headers in `validate_environment` based on `api_base`.
+    """
+    gemini = VertexGeminiConfig()
+
+    # Mock vertex_credentials to avoid real credential checks
+    with patch("litellm.vertex_credentials", "mock_credentials"):
+        # Scenario 1: api_base is None, litellm_params["api_base"] has "cloudflare"
+        gemini.vertex_ai_headers = {}  # Reset headers
+        litellm_params = {
+            "api_base": "https://gateway.ai.cloudflare.com/v1/account_id/gateway_id/google",
+            "vertex_project": "test-project",
+            "vertex_location": "test-location",
+        }
+        gemini.validate_environment(api_key="test_key", litellm_params=litellm_params)
+        assert "x-goog-api-key" in gemini.vertex_ai_headers
+        assert gemini.vertex_ai_headers["x-goog-api-key"] == "test_key"
+        assert "Authorization" not in gemini.vertex_ai_headers
+
+        # Scenario 2: api_base is provided directly and has "cloudflare"
+        gemini.vertex_ai_headers = {}  # Reset headers
+        api_base = "https://gateway.ai.cloudflare.com/v1/account_id/gateway_id/google"
+        gemini.validate_environment(
+            api_key="test_key",
+            api_base=api_base,
+            litellm_params={
+                "vertex_project": "test-project",
+                "vertex_location": "test-location",
+            },
+        )
+        assert "x-goog-api-key" in gemini.vertex_ai_headers
+        assert gemini.vertex_ai_headers["x-goog-api-key"] == "test_key"
+        assert "Authorization" not in gemini.vertex_ai_headers
+
+        # Scenario 3: api_base does not contain "cloudflare"
+        gemini.vertex_ai_headers = {}  # Reset headers
+        api_base = "https://us-central1-aiplatform.googleapis.com/v1/projects/test-project/locations/us-central1/publishers/google/models/gemini-pro:streamGenerateContent"
+        gemini.validate_environment(
+            api_key="test_key",
+            api_base=api_base,
+            litellm_params={
+                "vertex_project": "test-project",
+                "vertex_location": "test-location",
+            },
+        )
+        assert "Authorization" in gemini.vertex_ai_headers
+        assert "Bearer" in gemini.vertex_ai_headers["Authorization"]
+        assert "x-goog-api-key" not in gemini.vertex_ai_headers
+
